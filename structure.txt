@@ -1,0 +1,27 @@
+Backend/
+│
+├── data/
+│   ├── image
+│   ├── videos
+│   ├── audio
+│   ├── pdfs
+│   └── text
+│
+├── src/
+│   ├── data_processing/
+│   │   ├── __init__.py
+│   │   ├── image_processor.py
+│   │   ├── video_processor.py
+│   │   ├── audio_processor.py
+│   │   └── text_processor.py
+│   │
+│   ├── search/
+│   │   ├── __init__.py
+│   │   |── embedding_generator.py
+|   |   └──semantic_search.py
+│   │
+│   └── main.py
+│
+│
+├── requirements.txt
+└── README.md

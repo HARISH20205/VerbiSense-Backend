@@ -35,7 +35,7 @@ def process_audio_from_url(audio_url: str) -> List[Dict[str, Any]]:
             "file_name": audio_url.split("/")[-1],  # Extract filename from URL
             "text": segment["text"]
         })
-    print(segments)
+    print("*" * 100 + "\n" + "audio Successfull")
     return segments
 
 def process_audio_data(audio: np.ndarray, file_name: str) -> List[Dict[str, Any]]:

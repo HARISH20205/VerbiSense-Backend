@@ -167,7 +167,7 @@ def main(files: list, query: str) -> None:
         return
 
     # Perform semantic search
-    results = semantic_search(query, embeddings_df, embedding_model, num_results=3)
+    results = semantic_search(query, embeddings_df, embedding_model, num_results=1)
     if not results:
         logging.error("No results found. Exiting.")
         return
@@ -204,7 +204,9 @@ def main(files: list, query: str) -> None:
     print("="*50)
 
 if __name__ == "__main__":
-    # Example file input
-    files = ["https://storage.googleapis.com/verbisense.appspot.com/uploads/vsample.mp4"]  
-    query = "What is video about?"
+    files = [
+        "https://storage.googleapis.com/verbisense.appspot.com/uploads/tsample.txt",
+        
+    ] 
+    query = "What is document about?"
     main(files, query)

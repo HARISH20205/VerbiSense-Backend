@@ -1,0 +1,17 @@
+Backend/
+│
+├── src/
+│   ├── data_processing/
+│   │   ├── __init__.py
+│   │   ├── image_processor.py
+│   │   ├── video_processor.py
+│   │   ├── audio_processor.py
+│   │   └── text_processor.py
+│   │
+│   │
+│   |── main.py
+│   └── source.py
+│
+│
+├── requirements.txt
+└── README.md

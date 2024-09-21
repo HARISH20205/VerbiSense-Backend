@@ -1,12 +1,5 @@
 Backend/
 │
-├── data/
-│   ├── image
-│   ├── videos
-│   ├── audio
-│   ├── pdfs
-│   └── text
-│
 ├── src/
 │   ├── data_processing/
 │   │   ├── __init__.py
@@ -15,12 +8,9 @@ Backend/
 │   │   ├── audio_processor.py
 │   │   └── text_processor.py
 │   │
-│   ├── search/
-│   │   ├── __init__.py
-│   │   |── embedding_generator.py
-|   |   └──semantic_search.py
 │   │
-│   └── main.py
+│   |── main.py
+│   └── source.py
 │
 │
 ├── requirements.txt

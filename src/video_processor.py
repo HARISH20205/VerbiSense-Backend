@@ -1,27 +1,23 @@
-import subprocess
-from src.audio_processor import process_audio_file
+import ffmpeg
+import numpy as np
+from src.audio_processor import process_audio_data
 import os
-def process_video_file(file_path:str):
-    output_file = "files/audio1.mp3"
-    i = 1
-    while os.path.exists(output_file):
-        i += 1
-        output_file = f"files/audio{i}.mp3"
-
-    cmd = ["ffmpeg",
-           "-i",
-           file_path,
-           "-vn", 
-           "-acodec","libmp3lame",
-           "-ab","192k",
-           "-ar","44100",
-           "-y",
-           output_file
-    ]
+def process_video_file(file_path: str):
+    # Use ffmpeg to extract audio from the video file
     try:
-        subprocess.run(cmd, check=True)
-        result = process_audio_file("files/audio1.mp3")
-        return result
-    except Exception as e:
-        print(f"Error processing audio: {e}")
-        return []
+        out, _ = (
+            ffmpeg
+            .input(file_path)
+            .output('pipe:1', format='f32le', acodec='pcm_f32le', ac=1, ar='16k')
+            .run(capture_stdout=True, capture_stderr=True)
+        )
+    except ffmpeg.Error as e:
+        raise RuntimeError(f"Failed to extract audio from video: {e.stderr.decode()}") from e
+
+    # Convert the audio to the format Whisper expects
+    audio = np.frombuffer(out, np.float32).flatten()
+
+    # Pass file name to audio processor
+    file_name = os.path.basename(file_path)
+    result = process_audio_data(audio, file_name)
+    return result

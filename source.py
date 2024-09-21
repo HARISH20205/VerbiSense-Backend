@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Importing processors (assumed to be your custom modules)
 from src.text_processor import process_text_file
-from src.audio_processor import process_audio_file
+from src.audio_processor import process_audio_from_url
 from src.video_processor import process_video_file
 from src.image_processor import process_image_file
 
@@ -36,15 +36,15 @@ def process_files(file_paths: List[str]) -> List[Dict[str, Any]]:
         file_name = os.path.basename(file_path)
 
         # Validate if file exists
-        if not os.path.exists(file_path) or not os.path.isfile(file_path):
-            logging.error(f"File {file_name} does not exist.")
-            return []
+        # if not os.path.exists(file_path) or not os.path.isfile(file_path):
+        #     logging.error(f"File {file_name} does not exist.")
+        #     return []
 
         try:
             if extension in ['.txt', '.pdf', '.docx']:
                 return process_text_file(file_path)
             elif extension in ['.mp3', '.wav', '.flac']:
-                return process_audio_file(file_path)
+                return process_audio_from_url(file_path)
             elif extension in ['.mp4']:
                 return process_video_file(file_path)
             elif extension in ['.png', '.jpg', '.jpeg']:
@@ -167,7 +167,7 @@ def main(files: list, query: str) -> None:
         return
 
     # Perform semantic search
-    results = semantic_search(query, embeddings_df, embedding_model, num_results=10)
+    results = semantic_search(query, embeddings_df, embedding_model, num_results=3)
     if not results:
         logging.error("No results found. Exiting.")
         return
@@ -184,7 +184,8 @@ def main(files: list, query: str) -> None:
     print(df_results)
     model = genai.GenerativeModel("gemini-1.5-flash")
     
-    context = " ".join([result['text'] for result in results])[:1000]
+    context = " ".join([result['text'] for result in results])
+    print("*"*50+"\n"+context)
     
     logging.info(f"Context length: {len(context)} characters")
 
@@ -204,6 +205,6 @@ def main(files: list, query: str) -> None:
 
 if __name__ == "__main__":
     # Example file input
-    files = ['files/text.pdf', 'files/audio.mp3', 'files/image.png']  
-    query = "What is biology?"
+    files = ["https://storage.googleapis.com/verbisense.appspot.com/uploads/vsample.mp4"]  
+    query = "What is video about?"
     main(files, query)

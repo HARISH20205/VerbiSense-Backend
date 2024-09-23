@@ -9,12 +9,17 @@ from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 import logging
 import google.generativeai as genai
+import warnings
+import json
 import re
+# Suppress specific FutureWarning messages
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 
 # Load environment variables
 load_dotenv()
 
-#Gemini-API key
+# Gemini-API key
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Set up logging
@@ -34,12 +39,10 @@ def process_files(file_paths: List[str]) -> List[Dict[str, Any]]:
         _, extension = os.path.splitext(file_path)
         extension = extension.lower()
         file_name = os.path.basename(file_path)
-
-        # Validate if file exists
-        # if not os.path.exists(file_path) or not os.path.isfile(file_path):
-        #     logging.error(f"File {file_name} does not exist.")
-        #     return []
-
+        
+        if "?alt=media&token=" in extension:
+            extension = list(extension.split("?"))[0]
+        print("Hello" + extension)
         try:
             if extension in ['.txt', '.pdf', '.docx']:
                 return process_text_file(file_path)
@@ -55,15 +58,19 @@ def process_files(file_paths: List[str]) -> List[Dict[str, Any]]:
         except Exception as e:
             logging.error(f"Error processing file {file_name}: {e}", exc_info=True)
             return []
+    try:
+        # Process files in parallel, limiting threads to the number of CPU cores
+        with ThreadPoolExecutor(max_workers=min(len(file_paths), os.cpu_count())) as executor:
+            results = executor.map(process_single_file, file_paths)
+        # Flatten the results
+        processed_data = [item for result in results for item in result]
 
-    # Process files in parallel, limiting threads to the number of CPU cores
-    with ThreadPoolExecutor(max_workers=min(len(file_paths), os.cpu_count())) as executor:
-        results = executor.map(process_single_file, file_paths)
-
-    # Flatten the results
-    processed_data = [item for result in results for item in result]
-
-    return processed_data
+        if not processed_data:
+            return []
+        return processed_data
+    except ValueError:
+        logging.error("Input list is empty or contains invalid file paths")
+        return []
 
 
 def create_embeddings(processed_data: List[Dict[str, Any]], embedding_model: SentenceTransformer) -> pd.DataFrame:
@@ -146,67 +153,151 @@ def create_results_df(results: List[Dict[str, Any]]) -> pd.DataFrame:
             result_data[key] = [result[key] for result in results]
 
     return pd.DataFrame(result_data)
+def format_response(json_string):
+    # Remove the "```json" at the start and "```" at the end
+    clean_string = json_string.strip().replace("```json", "").replace("```", "").strip()
+    
+    # Convert the cleaned string to a Python dictionary
+    return json.loads(clean_string)
+
+def count_tokens(text: str) -> int:
+    """Roughly estimate the number of tokens in a text."""
+    return len(text.split())
 
 
-
-def main(files: list, query: str) -> None:
-    """Main function to process files, create embeddings, perform semantic search, and output results."""
-    # Load SentenceTransformer model only once
-    embedding_model = SentenceTransformer("all-mpnet-base-v2", device="cuda" if torch.cuda.is_available() else "cpu")
-
+def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens: int = 7700):
+    """Main function to process files, perform semantic search or send data directly to Gemini."""
+    
     # Process files
     processed_data = process_files(files)
-    if not processed_data:
-        logging.error("No data processed. Exiting.")
-        return
+    # Combine all text chunks
+    combined_text = " ".join([item["text"] for item in processed_data])
+    print("\n" + "="*50)
+    logging.info(f"text : {combined_text}")
+    logging.info(f"Total text length: {len(combined_text)} characters")
+    print("="*50)
+    
 
-    # Create embeddings
-    embeddings_df = create_embeddings(processed_data, embedding_model)
-    if embeddings_df.empty:
-        logging.error("No embeddings created. Exiting.")
-        return
+    # Count tokens and check if they exceed the allowed limit for Gemini
+    token_count = count_tokens(combined_text)
+    
+    if token_count < min_text_length:
+        logging.info(f"Text is below the threshold ({min_text_length} tokens). Sending directly to Gemini.")
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        prompt = f"""
+        Based on the context provided below, please answer the following question in a JSON format, optimized for direct integration into a webpage:
 
-    # Perform semantic search
-    results = semantic_search(query, embeddings_df, embedding_model, num_results=1)
-    if not results:
-        logging.error("No results found. Exiting.")
-        return
+        Context: {context}
 
-    # Save results to file (as CSV for better structure)
-    try:
-        df_results = create_results_df(results)
-        logging.info("Results saved to results.csv")
-    except Exception as e:
-        logging.error(f"Error writing results to file: {e}", exc_info=True)
+        Question: {query}
 
-    # Display results in DataFrame
-    logging.info("Displaying search results:")
-    print(df_results)
+        Your JSON response should contain each component into respective keys and values
+        {{
+            "summary": "A clear and concise summary of the answer.",
+            "heading1": "Main Heading",
+            "heading2": [
+                "Subheading 1",
+                "Subheading 2"
+            ]
+            "points": [
+                "Subheading 1" : ["point 1", "point 2", ....],
+                "Subheading 2" : ["point 1", "point 2", ....],
+            ],
+            "example": [
+                "Example for Subheading 1",
+                "Example for Subheading 2"
+            ],
+            "key_takeaways": "Key takeaways or insights from the answer."
+        }}
+        
+        Please ensure:
+        1. The summary is at the beginning.
+        2. Use bullet points or numbered lists within the 'points' key.
+        3. Keep the language user-friendly and accessible to a general audience.
+        4. If the answer involves steps or a process, number them clearly.
+        5. Maintain a clean structure for easy scanning and quick information retrieval.
+        6. give detailed answer if you want create more in correct template as mentioned
+        """
+
+        response = model.generate_content(prompt)
+        response = format_response(response.text)
+        print("\n" + "="*50)
+        print(response)
+        print("="*50)
+        return response
+    
+    if token_count > max_gemini_tokens:
+        logging.info(f"Text exceeds the maximum allowed tokens ({max_gemini_tokens}). Performing semantic search.")
+        # Only initialize embeddings when needed
+        embedding_model = SentenceTransformer("all-mpnet-base-v2", device="cuda" if torch.cuda.is_available() else "cpu")
+
+        # Create embeddings
+        embeddings_df = create_embeddings(processed_data, embedding_model)
+        if embeddings_df.empty:
+            logging.error("No embeddings created. Exiting.")
+            return
+
+        # Perform semantic search
+        num_results = min(5, len(embeddings_df))  # Adjust number of results based on available data
+        results = semantic_search(query, embeddings_df, embedding_model, num_results)
+        if not results:
+            logging.error("No results found. Exiting.")
+            return
+
+        # Use the top results for the context
+        context = " ".join([result['text'] for result in results])
+
+    else:
+        context = combined_text  # Use the full context if within token limit
+
+    # Send the context to Gemini
     model = genai.GenerativeModel("gemini-1.5-flash")
-    
-    context = " ".join([result['text'] for result in results])
-    print("*"*50+"\n"+context)
-    
-    logging.info(f"Context length: {len(context)} characters")
+    prompt = f"""
+        Based on the context provided below, please answer the following question in a JSON format, optimized for direct integration into a webpage:
 
-    prompt = f"""Based on the following context: '{context}', please provide a comprehensive answer to the question: '{query}'.
-    Include the following sections in your response:
-    1. A brief, direct answer to the question (2-3 sentences)
-    2. Key points or facts related to the question (3-5 points)
-    3. A short conclusion or summary (1-2 sentences)
-    Present the information in a clear, engaging, and easy-to-read manner."""
+        Context: {context}
+
+        Question: {query}
+
+        Your JSON response should contain each component into respective keys and values
+        {{
+            "summary": "A clear and concise summary of the answer.",
+            "heading1": "Main Heading",
+            "heading2": [
+                "Subheading 1",
+                "Subheading 2"
+            ]
+            "points": [
+                "Subheading 1" : ["point 1", "point 2", ....],
+                "Subheading 2" : ["point 1", "point 2", ....],
+            ],
+            "example": [
+                "Example for Subheading 1",
+                "Example for Subheading 2"
+            ],
+            "key_takeaways": "Key takeaways or insights from the answer."
+        }}
+        
+        Please ensure:
+        1. The summary is at the beginning.
+        2. Use bullet points or numbered lists within the 'points' key.
+        3. Keep the language user-friendly and accessible to a general audience.
+        4. If the answer involves steps or a process, number them clearly.
+        5. Maintain a clean structure for easy scanning and quick information retrieval.
+        6. give detailed answer if you want create more heading2, points2 dict as list remember it should be detailed
+        """
+
+
     
     response = model.generate_content(prompt)
-    
-    # Print the formatted output
-    print("\n" + "="*50)
-    print(response.text)
-    print("="*50)
+    response = format_response(response.text)
+    print(response)
+    return response
 
-if __name__ == "__main__":
-    files = [
-        "https://storage.googleapis.com/verbisense.appspot.com/uploads/tsample.txt",
-        
-    ] 
-    query = "What is document about?"
-    main(files, query)
+
+# if __name__ == "__main__":
+#     files = [
+#         #"https://storage.googleapis.com/verbisense.appspot.com/uploads/tsample.txt",
+#     ] 
+#     query = "in 200 words explain me what is Laptop?"   
+#     main(files, query)

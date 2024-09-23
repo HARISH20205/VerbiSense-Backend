@@ -26,12 +26,10 @@ def process_image_file(image_url: str) -> List[Dict[str, Any]]:
         # Combine the extracted text
         content = "\n".join(map(lambda detection: detection[1], result))
 
-        print("*" * 100 + "\n" + "Image successfull")
         
         return [{
             "file_name": os.path.basename(image_url),
             "text": content,
         }]
     else:
-        print(f"Failed to fetch the image file. Status code: {response.status_code}")
         return []

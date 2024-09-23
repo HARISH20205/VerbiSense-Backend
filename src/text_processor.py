@@ -8,7 +8,9 @@ import io
 def process_text_file(file_url: str) -> List[Dict[str, Any]]:
     _, extension = os.path.splitext(file_url)
     extension = extension.lower()
-
+    
+    if "?alt=media&token=" in extension:
+        extension = list(extension.split("?"))[0]
     if extension == '.txt':
         return process_txt(file_url)
     elif extension == '.pdf':
@@ -25,7 +27,6 @@ def process_txt(txt_url: str) -> List[Dict[str, Any]]:
     # Check if the request was successful
     if response.status_code == 200:
         content = response.text
-        print("*" * 100 + "\n" + "txt Successfull")
         return [{
             "file_name": os.path.basename(txt_url),
             "text": content,
@@ -33,6 +34,7 @@ def process_txt(txt_url: str) -> List[Dict[str, Any]]:
         }]
     else:
         print(f"Failed to fetch the TXT file. Status code: {response.status_code}")
+        return []
 
 def process_pdf(pdf_url: str) -> List[Dict[str, Any]]:
     # Fetch the PDF file content from the URL
@@ -51,7 +53,6 @@ def process_pdf(pdf_url: str) -> List[Dict[str, Any]]:
         for page_num in range(len(pdf_document)):
             page = pdf_document.load_page(page_num)  # Load the page
             pdf_text += page.get_text("text")  # Extract text from the page
-        print("*" * 100 + "\n" + "pdf Successfull")
 
         return [{
             "file_name": os.path.basename(pdf_url),
@@ -59,6 +60,7 @@ def process_pdf(pdf_url: str) -> List[Dict[str, Any]]:
         }]
     else:
         print(f"Failed to fetch the PDF file. Status code: {response.status_code}")
+        return []
 
 def process_docx(docx_url: str) -> List[Dict[str, Any]]:
     # Fetch the DOCX file content from the URL
@@ -74,7 +76,6 @@ def process_docx(docx_url: str) -> List[Dict[str, Any]]:
         
         # Extract text from the DOCX file
         content = "\n".join([para.text for para in doc.paragraphs])
-        print("*" * 100 + "\n" + "docx Successfull")
         return [{
             "file_name": os.path.basename(docx_url),
             "text": content,

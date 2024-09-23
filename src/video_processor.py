@@ -19,7 +19,5 @@ def process_video_file(file_path: str):
 
     # Pass file name to audio processor
     file_name = os.path.basename(file_path)
-    result = process_audio_data(audio, file_name)
-    print("*" * 100 + "\n" + "video Successfull")
-    
+    result = process_audio_data(audio, file_name)    
     return result

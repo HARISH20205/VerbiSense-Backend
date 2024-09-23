@@ -11,7 +11,8 @@ import logging
 import google.generativeai as genai
 import warnings
 import json
-import re
+
+
 # Suppress specific FutureWarning messages
 warnings.filterwarnings("ignore", category=FutureWarning)
 

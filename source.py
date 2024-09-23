@@ -157,7 +157,6 @@ def create_results_df(results: List[Dict[str, Any]]) -> pd.DataFrame:
 def format_response(json_string):
     # Remove the "```json" at the start and "```" at the end
     clean_string = json_string.strip().replace("```json", "").replace("```", "").strip()
-    
     # Convert the cleaned string to a Python dictionary
     return json.loads(clean_string)
 
@@ -172,16 +171,16 @@ def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens:
     # Process files
     processed_data = process_files(files)
     # Combine all text chunks
-    combined_text = " ".join([item["text"] for item in processed_data])
+    context = " ".join([item["text"] for item in processed_data])
     print("\n" + "="*50)
-    logging.info(f"text : {combined_text}")
-    logging.info(f"Total text length: {len(combined_text)} characters")
+    logging.info(f"text : {context}")
+    logging.info(f"Total text length: {len(context)} characters")
     print("="*50)
     
 
     # Count tokens and check if they exceed the allowed limit for Gemini
-    token_count = count_tokens(combined_text)
-    
+    token_count = count_tokens(context)
+    print("Context: ",context)
     if token_count < min_text_length:
         logging.info(f"Text is below the threshold ({min_text_length} tokens). Sending directly to Gemini.")
         model = genai.GenerativeModel("gemini-1.5-flash")
@@ -249,7 +248,7 @@ def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens:
         context = " ".join([result['text'] for result in results])
 
     else:
-        context = combined_text  # Use the full context if within token limit
+        context = context  # Use the full context if within token limit
 
     # Send the context to Gemini
     model = genai.GenerativeModel("gemini-1.5-flash")

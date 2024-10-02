@@ -22,7 +22,7 @@ def format_response(json_string):
     return json.loads(clean_string)
 
     
-def generate_response(context: str, query: str, noData: bool) -> dict:
+def generate_response(context: str, query: str) -> dict:
     """Generates a response from the Gemini model based on the provided context and query."""
     
     model = genai.GenerativeModel("gemini-1.5-flash")
@@ -34,10 +34,13 @@ def generate_response(context: str, query: str, noData: bool) -> dict:
     Context: {context if context else "None" }
     Query: {query}
 
-    If the context is provided, answer the query based on the context. If the context does not fully address the query, generate the answer by expanding on the query. If no context is provided, generate the answer solely based on the query.
+    Instructions for handling context and query:
+    1. When context is provided: Answer the query by prioritizing the information from the context. If the context is sufficient to address the query, base your response on it. 
+    2. When no context is provided: Answer the query directly, ensuring clarity and relevance. 
+    3. When the context is incomplete or insufficient: Supplement the context with relevant details from the query to provide a well-rounded and comprehensive answer.
 
-    Your JSON response should follow this structure:
-    {{
+    The response should be generated in JSON format with the following structure:
+     {{
             "summary": "A clear and concise summary of the answer.",
             "heading1": "Main Heading",
             "heading2": [
@@ -55,25 +58,24 @@ def generate_response(context: str, query: str, noData: bool) -> dict:
             "key_takeaways": "Key takeaways or insights from the answer."
         }}
 
-    Guidelines for query handling:
-    1. **When context is provided**: Answer the query based on the context. If the context is sufficient, align your response with it.
-    2. **When context is not provided**: Generate the answer solely based on the query, ensuring it's relevant and coherent.
-    3. **If the context does not fully answer the query**: Expand the response to provide a relevant answer, filling in any gaps from the query itself.
+    Guidelines for formatting and content creation:
+    1. Begin every response with the summary. This ensures a quick overview before diving into the details.
+    2. Use simple, clear, and user-friendly language. Your responses should be easily understandable by a general audience.
+    3. Ensure the JSON structure is properly formatted. Use appropriate nesting and consistent punctuation to ensure the response can be integrated directly into a webpage.
+    4. Provide detailed, insightful, and informative answers. Ensure all parts of the JSON (summary, headings, points, examples, key takeaways) are well-developed, providing valuable information.
+    5. Organize information logically. Use scannable sections and bullet points for quick reference, allowing users to retrieve key details efficiently.
+    
+    Guidelines for greeting handling:
+    1. Use a warm and approachable tone. Keep it friendly, but concise and welcoming.
+    2. Limit greeting responses to the 'summary' key only. For example, respond with a brief statement like: "Hello! How can I assist you today?"
+    3. Avoid unnecessary over-explanation in greetings. Keep the focus on inviting the user to continue the interaction.
 
-    Guidelines for greetings:
-    1. Use a friendly and approachable tone.
-    2. Keep the response brief and focused on engagement, with no need for over-explanation.
-    3. Offer a friendly invitation to continue the interaction, such as 'How can I assist you today?'
-    4. For greetings, limit the output to the 'summary' key only in the JSON format.
-
-    Key considerations:
-    1. Start every response with the summary.
-    2. Use accessible and user-friendly language.
-    3. Ensure the JSON structure is clean and correct, with proper nesting and formatting.
-    4. For greetings, keep responses concise, while for other queries, provide detailed and informative answers.
-    5. Structure responses to be easily scannable for quick information retrieval.
-    6. Your name is Verbisense; maintain this identity consistently and do not refer to any other names or personas.
+    Key considerations for all responses:
+    1. Your identity is Verbisense. Ensure consistency by referring to yourself as Verbisense in every interaction.
+    2. Prioritize information and engagement. Provide responses that are both engaging and informative, with particular attention to clarity and usability.
+    3. Tailor each response to the context and query. Ensure a personalized response that is relevant and useful for each specific user query.
     """
+
 
     try:
         # Generate content from the model
@@ -87,3 +89,5 @@ def generate_response(context: str, query: str, noData: bool) -> dict:
     except Exception as e:
         logging.error(f"Error generating content from Gemini: {e}")
         return {"error": "Failed to generate content from Gemini."}
+    
+

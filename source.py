@@ -11,6 +11,7 @@ import logging
 import google.generativeai as genai
 import warnings
 import json
+from annoy import AnnoyIndex
 
 
 # Suppress specific FutureWarning messages
@@ -74,53 +75,64 @@ def process_files(file_paths: List[str]) -> List[Dict[str, Any]]:
         return processed_data
     except ValueError:
         logging.error("contains invalid file paths")
-        return []
-
+        
+        
 def create_embeddings(processed_data: List[Dict[str, Any]], embedding_model: SentenceTransformer) -> pd.DataFrame:
     """Generates embeddings for processed data."""
     try:
         text_chunks = [item["text"] for item in processed_data]
-        embeddings = torch.empty((0, embedding_model.get_sentence_embedding_dimension()), device=embedding_model.device)
+        embeddings_list = []  # Store embeddings in a list
         batch_size = 32
 
         # Process embeddings in batches to optimize memory usage
         for i in range(0, len(text_chunks), batch_size):
-            batch_embeddings = embedding_model.encode(text_chunks[i:i + batch_size], convert_to_tensor=True)
-            embeddings = torch.cat((embeddings, batch_embeddings), dim=0)
+            batch_embeddings = embedding_model.encode(text_chunks[i:i + batch_size], convert_to_tensor=False)  # Avoid torch tensor
+            embeddings_list.extend(batch_embeddings)  # Accumulate embeddings
             logging.info(f"Processed batch {i // batch_size + 1}/{(len(text_chunks) + batch_size - 1) // batch_size}")
 
+        # Convert to numpy array of float32 for compatibility with Annoy
+        embeddings_np = np.array(embeddings_list).astype('float32')
+
+        # Create a DataFrame with the embeddings
         df = pd.DataFrame(processed_data)
-        df["embedding"] = embeddings.cpu().numpy().tolist()
+        df["embedding"] = embeddings_np.tolist()
         return df
     except Exception as e:
         logging.error(f"Error creating embeddings: {e}", exc_info=True)
         return pd.DataFrame()
 
 
-def semantic_search(query: str, embeddings_df: pd.DataFrame, embedding_model: SentenceTransformer, num_results: int) -> List[Dict[str, Any]]:
-    """Performs semantic search using embeddings and returns the top results."""
+
+
+def semantic_search_annoy(query: str, embeddings_df: pd.DataFrame, embedding_model: SentenceTransformer, num_results: int) -> List[Dict[str, Any]]:
+    """Performs semantic search using Annoy for approximate nearest neighbors."""
     try:
         # Create embedding for the query
-        query_embedding = embedding_model.encode(query, convert_to_tensor=True)
+        query_embedding = embedding_model.encode(query, convert_to_tensor=False)
 
-        # Convert embeddings from DataFrame to a tensor
-        embeddings = torch.tensor(np.array(embeddings_df["embedding"].tolist()), dtype=torch.float32).to(embedding_model.device)
+        # Convert embeddings from DataFrame to numpy array
+        embeddings = np.array(embeddings_df["embedding"].tolist()).astype('float32')
 
-        # Measure search time
+        # Initialize Annoy index
+        dimension = embedding_model.get_sentence_embedding_dimension()
+        annoy_index = AnnoyIndex(dimension, 'dot')  # Use dot product for similarity
+
+        # Add embeddings to Annoy index
+        for i, embedding in enumerate(embeddings):
+            annoy_index.add_item(i, embedding)
+
+        # Build the index (with a tradeoff of speed vs. accuracy)
+        annoy_index.build(10)  # Number of trees; more trees give better accuracy but slower performance
+
+        # Search for nearest neighbors
         start_time = timer()
-        dot_scores = util.dot_score(query_embedding, embeddings)[0]
+        indices = annoy_index.get_nns_by_vector(query_embedding, num_results, include_distances=True)
         end_time = timer()
-        logging.info(f"Time taken to get scores on {len(embeddings)} embeddings: {end_time - start_time:.5f} seconds.")
+        logging.info(f"Time taken for Annoy search: {end_time - start_time:.5f} seconds.")
 
-        # Get the top results
-        top_results = torch.topk(dot_scores, k=num_results)
         results = []
-
-        # Format the results
-        for score, idx in zip(top_results.values, top_results.indices):
-            idx = idx.item()  # Convert tensor to integer
+        for idx in indices[0]:
             result = {
-                "score": score.item(),
                 "text": embeddings_df.iloc[idx]["text"],
                 "file_name": embeddings_df.iloc[idx]["file_name"],
                 **{k: v for k, v in embeddings_df.iloc[idx].items() if k not in ["text", "file_name", "embedding"]}
@@ -129,8 +141,9 @@ def semantic_search(query: str, embeddings_df: pd.DataFrame, embedding_model: Se
 
         return results
     except Exception as e:
-        logging.error(f"Error during semantic search: {e}", exc_info=True)
+        logging.error(f"Error during semantic search with Annoy: {e}", exc_info=True)
         return []
+
     
     
 def count_tokens(text: str) -> int:
@@ -142,11 +155,8 @@ def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens:
     """Main function to process files, perform semantic search or send data directly to Gemini."""
     
     try:
-        noData=False
         # Process files (your existing file processing logic)
         processed_data = process_files(files)
-        if not processed_data:
-            noData = True
         # Combine all text chunks
         combined_text = " ".join([item["text"] for item in processed_data])
 
@@ -158,7 +168,7 @@ def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens:
         # If token count is within limits, send directly to Gemini for response generation
         if token_count < min_text_length:
             logging.info(f"Text is below the threshold ({min_text_length} tokens). Sending directly to Gemini.")
-            response = generate_response(combined_text, query,noData)
+            response = generate_response(combined_text, query)
             return response
         else:
             logging.info(f"Text exceeds the maximum allowed tokens ({max_gemini_tokens}). Performing semantic search.")
@@ -173,13 +183,13 @@ def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens:
 
             # Perform semantic search
             num_results = min(1, len(embeddings_df))  # Adjust number of results based on available data
-            results = semantic_search(query, embeddings_df, embedding_model, num_results)
+            results = semantic_search_annoy(query, embeddings_df, embedding_model, num_results)
             print("Semantic Searchs return the top results with relevant scores and contextual information. \n",results)
             if not results:
                 logging.error("No results found. Exiting.")
                 return {"error": "Semantic search returned no results."}
             context = " ".join([result['text'] for result in results])  # Example context generation from results
-            response = generate_response(context, query, noData)
+            response = generate_response(context, query)
             return response
     except Exception as e:
         logging.error(f"Error: {e}")

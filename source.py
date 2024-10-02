@@ -36,7 +36,9 @@ from response import generate_response
 
 def process_files(file_paths: List[str]) -> List[Dict[str, Any]]:
     """Processes a list of files in parallel and returns their processed content."""
-    
+    if file_paths == []:
+        logging.info("No files to process")
+        return []
     def process_single_file(file_path):
         _, extension = os.path.splitext(file_path)
         extension = extension.lower()
@@ -71,7 +73,7 @@ def process_files(file_paths: List[str]) -> List[Dict[str, Any]]:
             return []
         return processed_data
     except ValueError:
-        logging.error("Input list is empty or contains invalid file paths")
+        logging.error("contains invalid file paths")
         return []
 
 def create_embeddings(processed_data: List[Dict[str, Any]], embedding_model: SentenceTransformer) -> pd.DataFrame:
@@ -136,7 +138,7 @@ def count_tokens(text: str) -> int:
     return len(text.split())
     
 
-def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens: int = 7500):
+def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens: int = 7300):
     """Main function to process files, perform semantic search or send data directly to Gemini."""
     
     try:

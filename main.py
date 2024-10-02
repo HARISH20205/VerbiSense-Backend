@@ -29,9 +29,9 @@ bucket = storage.bucket("verbisense.appspot.com")
 @app.post("/chat")
 async def chat(data: QueryChat):
     try:
-        print(data.userId)
-        print(data.files)
-        print(data.query)
+        print("userId : ",data.userId)
+        print("files : ",data.files)
+        print("query : ",data.query)
         
         response = main(data.files,data.query)
         

@@ -20,13 +20,12 @@ def format_response(json_string):
     clean_string = json_string.strip().replace("```json", "").replace("```", "").replace("*","").replace("`","").strip()
     # Convert the cleaned string to a Python dictionary
     return json.loads(clean_string)
-
     
 def generate_response(context: str, query: str) -> dict:
     """Generates a response from the Gemini model based on the provided context and query."""
     
     model = genai.GenerativeModel("gemini-1.5-flash")
-
+        
     # Define a general prompt template for other queries
     general_prompt_template = f"""
     Given the following context and query, generate a JSON-formatted answer optimized for direct integration into a webpage.
@@ -39,7 +38,7 @@ def generate_response(context: str, query: str) -> dict:
     2. When no context is provided: Answer the query directly, ensuring clarity and relevance. 
     3. When the context is incomplete or insufficient: Supplement the context with relevant details from the query to provide a well-rounded and comprehensive answer.
 
-    The response should be generated in JSON format with the following structure:
+    The response should be generated in the format with the following structure:
      {{
             "summary": "A clear and concise summary of the answer.",
             "heading1": "Main Heading",
@@ -59,11 +58,16 @@ def generate_response(context: str, query: str) -> dict:
         }}
 
     Guidelines for formatting and content creation:
-    1. Begin every response with the summary. This ensures a quick overview before diving into the details.
+    1. Provide Summary only if the context is not sufficient to answer the query. The summary should be a concise overview of the response.
     2. Use simple, clear, and user-friendly language. Your responses should be easily understandable by a general audience.
     3. Ensure the JSON structure is properly formatted. Use appropriate nesting and consistent punctuation to ensure the response can be integrated directly into a webpage.
     4. Provide detailed, insightful, and informative answers. Ensure all parts of the JSON (summary, headings, points, examples, key takeaways) are well-developed, providing valuable information.
     5. Organize information logically. Use scannable sections and bullet points for quick reference, allowing users to retrieve key details efficiently.
+    6. provide the key takeaways in the response if its not a greeting or simple message. This should be a clear and concise statement summarizing the main insights or conclusions from the answer.
+    7. try to provide 5-10 points for each subheading. This will help to provide a comprehensive and detailed response to the query.
+    8. dont limit the headings and subheadings to the ones provided in the query. Feel free to add more headings and subheadings as needed to provide a complete response.
+    9. provided as much information as possible in the response. This will help to ensure that the user gets a comprehensive answer to their query.
+    10. check multiple times wheather the output is in the correct mentioned format or not. This will help to ensure that the response can be easily integrated into a webpage.
     
     Guidelines for greeting handling:
     1. Use a warm and approachable tone. Keep it friendly, but concise and welcoming.
@@ -80,6 +84,7 @@ def generate_response(context: str, query: str) -> dict:
     try:
         # Generate content from the model
         response = model.generate_content(general_prompt_template)
+        print(response.text)
         response_json = format_response(response.text)
         
         logging.info("Response generated successfully.")

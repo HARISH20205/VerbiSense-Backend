@@ -122,7 +122,7 @@ def semantic_search_annoy(query: str, embeddings_df: pd.DataFrame, embedding_mod
             annoy_index.add_item(i, embedding)
 
         # Build the index (with a tradeoff of speed vs. accuracy)
-        annoy_index.build(10)  # Number of trees; more trees give better accuracy but slower performance
+        annoy_index.build(1)  # Number of trees; more trees give better accuracy but slower performance
 
         # Search for nearest neighbors
         start_time = timer()
@@ -151,7 +151,7 @@ def count_tokens(text: str) -> int:
     return len(text.split())
     
 
-def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens: int = 7300):
+def main(files: list, query: str, min_text_length: int = 10000, max_gemini_tokens: int = 7300):
     """Main function to process files, perform semantic search or send data directly to Gemini."""
     
     try:
@@ -164,7 +164,7 @@ def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens:
 
         # Count tokens and check if they exceed the allowed limit for Gemini
         token_count = count_tokens(combined_text)
-
+        print("Token count : ",token_count)
         # If token count is within limits, send directly to Gemini for response generation
         if token_count < min_text_length:
             logging.info(f"Text is below the threshold ({min_text_length} tokens). Sending directly to Gemini.")

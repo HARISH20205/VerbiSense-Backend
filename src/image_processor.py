@@ -32,7 +32,7 @@ def process_image_file(image_url: str) -> List[Dict[str, Any]]:
         # Combine the extracted text from EasyOCR
         extracted_text = "\n".join([detection[1] for detection in result])
 
-        if not extracted_text:
+        if len(extracted_text.split())<5 :
             # Use the BLIP model for image captioning
             client = Client("HARISH20205/blip-image-caption")
             caption_result = client.predict(image_url=image_url, api_name="/predict")

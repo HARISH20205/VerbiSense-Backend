@@ -151,7 +151,7 @@ def count_tokens(text: str) -> int:
     return len(text.split())
     
 
-def main(files: list, query: str, min_text_length: int = 500, max_gemini_tokens: int = 7300):
+def main(files: list, query: str, min_text_length: int = 1000000, max_gemini_tokens: int = 7300):
     """Main function to process files, perform semantic search or send data directly to Gemini."""
     
     try:

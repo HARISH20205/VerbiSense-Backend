@@ -11,7 +11,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['http://localhost:5173'],  # Allow only localhost:5173
+    allow_origins=['https://verbisense.vercel.app/'],  # Allow only localhost:5173
     allow_credentials=True, 
     allow_methods=['*'],
     allow_headers=['*']

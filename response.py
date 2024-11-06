@@ -20,7 +20,6 @@ def format_response(json_string):
     clean_string = json_string.strip().replace("```json", "").replace("```", "").replace("*","").replace("`","").strip()
     # Convert the cleaned string to a Python dictionary
     return json.loads(clean_string)
-
     
 def generate_response(context: str, query: str) -> dict:
     """Generates a response from the Gemini model based on the provided context and query."""
@@ -90,6 +89,7 @@ def generate_response(context: str, query: str) -> dict:
     try:
         # Generate content from the model
         response = model.generate_content(general_prompt_template)
+        print(response.text)
         response_json = format_response(response.text)
         
         print(response.text)

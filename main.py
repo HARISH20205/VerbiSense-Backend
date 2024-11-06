@@ -1,25 +1,46 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from firebase import db
-from firebase_admin import auth
+from firebase_admin import auth, storage
 from pydantic import BaseModel
+from typing import Dict, List
+import os
+from source import main
 
 app = FastAPI()
 
-class UserRegister(BaseModel):
-    email: str
-    password: str
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['http://localhost:5173'],  # Allow only localhost:5173
+    allow_credentials=True, 
+    allow_methods=['*'],
+    allow_headers=['*']
+)
 
-@app.get('/')
-async def hello():
-    return {"message": "Hello, World!"}
-
-# Route to create a user in Firebase Authentication
-@app.post("/register")
-async def register_user(user: UserRegister):
-    try:
-        # Create the user with email and password
-        user_record = auth.create_user(email=user.email, password=user.password)
+class QueryChat(BaseModel):
+    userId: str
+    files: List
+    query: str
     
-        return {"message": "User created successfully", "uid": user_record.uid}
+    
+bucket = storage.bucket("verbisense.appspot.com") 
+    
+
+@app.post("/chat")
+async def chat(data: QueryChat):
+    try:
+        print("userId : ",data.userId)
+        print("files : ",data.files)
+        print("query : ",data.query)
+        
+        response = main(data.files,data.query)
+        
+        print("\n" + "="*50)
+        print(response)
+        print("="*50)
+        if not response:
+            return False
+        return {"query":data.query,"response":response}
+        
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")

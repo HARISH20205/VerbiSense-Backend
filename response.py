@@ -24,15 +24,10 @@ def format_response(json_string):
 def generate_response(context: str, query: str) -> dict:
     """Generates a response from the Gemini model based on the provided context and query."""
     
-    model = genai.GenerativeModel("gemini-1.5-flash")
-        
-    # Define a general prompt template for other queries
-    general_prompt_template = f"""
-    Given the following context and query, generate a JSON-formatted answer optimized for direct integration into a webpage.
-
-    Context: {context if context else "None" }
-    Query: {query}
-
+    model = genai.GenerativeModel(
+    "models/gemini-1.5-flash",
+    system_instruction="""
+    You are a Document query system named Verbisense
     Instructions for handling context and query:
     1. When context is provided: Answer the query by prioritizing the information from the context. If the context is sufficient to address the query, base your response on it. 
     2. When no context is provided: Answer the query directly, ensuring clarity and relevance. 
@@ -78,15 +73,26 @@ def generate_response(context: str, query: str) -> dict:
     1. Your identity is Verbisense. Ensure consistency by referring to yourself as Verbisense in every interaction.
     2. Prioritize information and engagement. Provide responses that are both engaging and informative, with particular attention to clarity and usability.
     3. Tailor each response to the context and query. Ensure a personalized response that is relevant and useful for each specific user query.
+""", generation_config={"response_mime_type": "application/json"}
+    )
+
+    # Define a general prompt template for other queries
+    general_prompt_template = f"""
+    Given the following context and query, generate a JSON-formatted answer optimized for direct integration into a webpage.
+
+    Context: {context if context else "None" }
+    Query: {query}
+
     """
-
-
+    
+    
     try:
         # Generate content from the model
         response = model.generate_content(general_prompt_template)
         print(response.text)
         response_json = format_response(response.text)
         
+        print(response.text)
         logging.info("Response generated successfully.")
         
         return response_json

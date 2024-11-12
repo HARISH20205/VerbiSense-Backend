@@ -25,6 +25,9 @@ class QueryChat(BaseModel):
     
 bucket = storage.bucket("verbisense.appspot.com") 
     
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to Verbisense!"}
 
 @app.post("/chat")
 async def chat(data: QueryChat):

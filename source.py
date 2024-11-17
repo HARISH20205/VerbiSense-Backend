@@ -11,7 +11,6 @@ import logging
 import google.generativeai as genai
 import warnings
 import json
-from annoy import AnnoyIndex
 
 
 # Suppress specific FutureWarning messages
@@ -104,35 +103,30 @@ def create_embeddings(processed_data: List[Dict[str, Any]], embedding_model: Sen
 
 
 
-def semantic_search_annoy(query: str, embeddings_df: pd.DataFrame, embedding_model: SentenceTransformer, num_results: int) -> List[Dict[str, Any]]:
-    """Performs semantic search using Annoy for approximate nearest neighbors."""
+def semantic_search(query: str, embeddings_df: pd.DataFrame, embedding_model: SentenceTransformer, num_results: int) -> List[Dict[str, Any]]:
+    """Performs semantic search using embeddings and returns the top results."""
     try:
         # Create embedding for the query
-        query_embedding = embedding_model.encode(query, convert_to_tensor=False)
+        query_embedding = embedding_model.encode(query, convert_to_tensor=True)
 
-        # Convert embeddings from DataFrame to numpy array
-        embeddings = np.array(embeddings_df["embedding"].tolist()).astype('float32')
+        # Convert embeddings from DataFrame to a tensor
+        embeddings = torch.tensor(np.array(embeddings_df["embedding"].tolist()), dtype=torch.float32).to(embedding_model.device)
 
-        # Initialize Annoy index
-        dimension = embedding_model.get_sentence_embedding_dimension()
-        annoy_index = AnnoyIndex(dimension, 'dot')  # Use dot product for similarity
-
-        # Add embeddings to Annoy index
-        for i, embedding in enumerate(embeddings):
-            annoy_index.add_item(i, embedding)
-
-        # Build the index (with a tradeoff of speed vs. accuracy)
-        annoy_index.build(1)  # Number of trees; more trees give better accuracy but slower performance
-
-        # Search for nearest neighbors
+        # Measure search time
         start_time = timer()
-        indices = annoy_index.get_nns_by_vector(query_embedding, num_results, include_distances=True)
+        dot_scores = util.dot_score(query_embedding, embeddings)[0]
         end_time = timer()
-        logging.info(f"Time taken for Annoy search: {end_time - start_time:.5f} seconds.")
+        logging.info(f"Time taken to get scores on {len(embeddings)} embeddings: {end_time - start_time:.5f} seconds.")
 
+        # Get the top results
+        top_results = torch.topk(dot_scores, k=num_results)
         results = []
-        for idx in indices[0]:
+
+        # Format the results
+        for score, idx in zip(top_results.values, top_results.indices):
+            idx = idx.item()  # Convert tensor to integer
             result = {
+                "score": score.item(),
                 "text": embeddings_df.iloc[idx]["text"],
                 "file_name": embeddings_df.iloc[idx]["file_name"],
                 **{k: v for k, v in embeddings_df.iloc[idx].items() if k not in ["text", "file_name", "embedding"]}
@@ -141,9 +135,8 @@ def semantic_search_annoy(query: str, embeddings_df: pd.DataFrame, embedding_mod
 
         return results
     except Exception as e:
-        logging.error(f"Error during semantic search with Annoy: {e}", exc_info=True)
+        logging.error(f"Error during semantic search: {e}", exc_info=True)
         return []
-
     
     
 def count_tokens(text: str) -> int:
@@ -182,7 +175,7 @@ def main(files: list, query: str, min_text_length: int = 1000000, max_gemini_tok
 
             # Perform semantic search
             num_results = min(1, len(embeddings_df))  # Adjust number of results based on available data
-            results = semantic_search_annoy(query, embeddings_df, embedding_model, num_results)
+            results = semantic_search(query, embeddings_df, embedding_model, num_results)
             print("Semantic Searchs return the top results with relevant scores and contextual information. \n",results)
             if not results:
                 logging.error("No results found. Exiting.")

@@ -1,46 +1,69 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from firebase import db
-from firebase_admin import auth, storage
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel
-from typing import Dict, List
+from typing import List
 import os
+from dotenv import load_dotenv
 from source import main
+import logging
+
+load_dotenv()
+
+# Setup logging
+logging.basicConfig(filename="error.log", level=logging.ERROR)
 
 app = FastAPI()
 
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://verbisense.vercel.app'],  # Allow only localhost:5173
-    allow_credentials=True, 
-    allow_methods=['*'],
-    allow_headers=['*']
+    allow_origins=["https://verbisense.vercel.app"],  # Only allow frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
+# Trusted Hosts
+app.add_middleware(
+    TrustedHostMiddleware, allowed_hosts=["verbisense.vercel.app", "harish20205-verbisense.hf.space"]
+)
+
+# Middleware to Block Unauthorized Origins
+@app.middleware("http")
+async def block_unauthorized_origins(request: Request, call_next):
+    origin = request.headers.get("origin")
+    if origin and origin != "https://verbisense.vercel.app":
+        raise HTTPException(status_code=403, detail="Unauthorized origin")
+    response = await call_next(request)
+    return response
+
+# Request Model
 class QueryChat(BaseModel):
     userId: str
     files: List
     query: str
-    
-    
-bucket = storage.bucket("verbisense.appspot.com") 
-    
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to Verbisense!"}
 
 @app.post("/chat")
 async def chat(data: QueryChat):
     try:
-        print("userId : ",data.userId)
-        print("files : ",data.files)
-        print("query : ",data.query)
-        
-        response = main(data.files,data.query)
-        
-        print("\n" + "="*50)
+        print(f"userId: {data.userId}")
+        print(f"files: {data.files}")
+        print(f"query: {data.query}")
+
+        response = main(data.files, data.query)
+
+        print("\n" + "=" * 50)
         print(response)
-        print("="*50)
-        if not response:
-            return False
-        return {"query":data.query,"response":response}
-        
+        print("=" * 50)
+
+
+        return {"query": data.query, "response": response}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
+        logging.error(f"An error occurred: {e}")
+        raise HTTPException(status_code=500, detail="An internal error occurred.")
